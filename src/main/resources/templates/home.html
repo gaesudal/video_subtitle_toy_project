@@ -1,0 +1,234 @@
+<html xmlns:th="http://www.thymeleaf.org">
+<!DOCTYPE html>
+<html>
+<link href="https://vjs.zencdn.net/8.9.0/video-js.css" rel="stylesheet" />
+<style>
+  #my-video {
+    width: 640px;
+    height: 360px;
+  }
+</style>
+<body>
+<div>
+  <h1>Youtube Downloader</h1>
+  <p>Enter youtube url and click get video button</p>
+  <div id="videoContainer" style="width: 640px; height: 360px">
+    <img src="start.png" id="start">
+    </video>
+  </div>
+</div>
+<input type="text" id="videoUrl">
+<button id="getVideoButton">get video</button><div id="subtitleButton"></div>
+<table id="subtitlesTable"></table>
+</body>
+<script src="https://vjs.zencdn.net/8.9.0/video.min.js"></script>
+<script>
+
+  let main = {
+    subtitle: '',
+    init: function () {
+      document.querySelector('#getVideoButton').addEventListener('click', main.getVideoSource);
+    },
+    getVideoSource: function () {
+      document.querySelector('#videoContainer').innerHTML = `
+      <img src="loading.png" id="loading">
+    `;
+      fetch('/youtube-download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: document.querySelector('#videoUrl').value,
+        }),
+      })
+      .then(response => response.json())
+      .then(data => {
+        main.updateVideoSource(data.fileName);
+        main.subtitle = data.fileName;
+        main.displaySubtitles(data.fileName);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    },
+    updateVideoSource: function (newFileName) {
+      document.getElementById('videoContainer').innerHTML = `
+      <video
+        id="my-video"
+        class="video-js vjs-default-skin"
+        width="640"
+        height="360"
+        controls
+        preload="auto"
+        poster="/thumbnail/${newFileName}.jpg"
+      >
+        <source src="/video/${newFileName}.webm" type="video/webm" />
+        <track kind="subtitles" srclang="ko" label="Korean" src="/subtitle/${newFileName}.vtt" default />
+        <p class="vjs-no-js">
+          To view this video please enable JavaScript, and consider upgrading to a
+          web browser that
+          <a href="https://videojs.com/html5-video-support/" target="_blank"
+          >supports HTML5 video</a
+          >
+        </p>
+      </video>
+    `;
+    },
+    displaySubtitles: function () {
+
+      fetch(`/subtitle/${main.subtitle}.vtt`)
+      .then(response => response.text())
+      .then(data => {
+        const lines = data.split('\n');
+
+        const subtitleButton = document.getElementById('subtitleButton');
+        subtitleButton.innerHTML = '';
+        subtitleButton.innerHTML += '<span>Loop</span><input type="checkbox" id="checkLoop">';
+        subtitleButton.innerHTML += '<button id="downloadSubtitle">자막다운</button>'
+        subtitleButton.innerHTML += '<button id="updateSubtitle">자막수정</button>'
+
+        const table = document.getElementById('subtitlesTable');
+        table.innerHTML += '<tr><th>순서</th><th>시간</th><th>대사</th></tr>';
+
+        let number = '', time = '', text = '';
+        for (let i = 2; i < lines.length; i++) {
+          const line = lines[i];
+          if (i % 4 === 2) {
+            number = line;
+          } else if (i % 4 === 3 && line.includes('-->')) {
+            time = line;
+          } else if (i % 4 === 0 && line.trim() !== '') {
+            text += line;
+          } else {
+            table.innerHTML += `<tr><td><a class="move-time" href="#" data-value="${time}">${number}</td><td><input type="text" class="input-time" value="${time}" placeholder="${time}"></td><td><input type="text" class="input-text" value="${text}" placeholder="${text}"></td></a></tr>`;
+            number = '';
+            time = '';
+            text = '';
+          }
+        }
+      })
+      .then(() => {
+        document.querySelector("#checkLoop").addEventListener('change', () => {
+          const video = document.querySelector('#my-video');
+          video.removeEventListener('timeupdate', video.onTimeUpdate);
+        });
+        console.log('displaySubtitles')
+        console.log(main.subtitle);
+        document.querySelector("#downloadSubtitle").addEventListener('click', main.clickDownloadSubtitle);
+        document.querySelector("#updateSubtitle").addEventListener('click', () => {
+          const inputTimes = document.querySelectorAll('.input-time');
+          const inputTexts = document.querySelectorAll('.input-text');
+          const newSubtitles = [];
+          for (let i = 0; i < inputTimes.length; i++) {
+            const inputTime = inputTimes[i];
+            const inputText = inputTexts[i];
+            if (main.validateTime(inputTime.value)) {
+              newSubtitles.push(`${i + 1}\n${inputTime.value}\n${inputText.value}\n\n`);
+            } else {
+              alert('시간 형식이 맞지 않습니다.');
+              return;
+            }
+          }
+          fetch(`/update/subtitle/${main.subtitle}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              subtitles: newSubtitles,
+            }),
+          })
+          .then(response => response.json())
+          .then(data => {
+            console.log(data)
+            main.updateSubtitle(data.fileName);
+          })
+          .catch(error => {
+            console.error('Error:', error);
+          });
+        })
+        ;
+        document.querySelectorAll('.move-time').forEach(moveTimeClick => {
+          moveTimeClick.addEventListener('click', (e) => {
+            e.preventDefault();
+            main.moveSubtitleTime(moveTimeClick.dataset.value, e);
+          });
+        });
+      });
+    },
+    convertTimeToSeconds: function (timeString) {
+      const parts = timeString.split(':');
+      const secondsParts = parts[2].split('.');
+
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      const seconds = parseInt(secondsParts[0], 10);
+      const milliseconds = parseInt(secondsParts[1], 10) / 1000;
+
+      return hours * 3600 + minutes * 60 + seconds + milliseconds;
+    },
+    moveSubtitleTime: function (timeString) {
+      const video = document.querySelector('#my-video');
+      const splitTime = timeString.split('-->');
+      const loopStart = main.convertTimeToSeconds(splitTime[0]);
+      const loopEnd = main.convertTimeToSeconds(splitTime[1]);
+
+      video.removeEventListener('timeupdate', video.onTimeUpdate);
+      video.currentTime = loopStart;
+
+      const onTimeUpdate = function () {
+        if (this.currentTime >= loopEnd && document.querySelector('#checkLoop').checked) {
+          video.currentTime = loopStart;
+        }
+      }
+      video.addEventListener('timeupdate', onTimeUpdate);
+      video.play();
+      video.onTimeUpdate = onTimeUpdate;
+    },
+    validateTime: function (time) {
+      console.log(time);
+      if (time === '' || !time.includes('-->')) {
+        return false;
+      }
+      const splitTime = time.split('-->');
+      const startTimeRegex = /^(\d{2}):([0-5][0-9]):([0-5][0-9])\.\d{3}\s$/;
+      const endTimeRegex = /^\s(\d{2}):([0-5][0-9]):([0-5][0-9])\.\d{3}$/;
+      return (startTimeRegex.test(splitTime[0]) && endTimeRegex.test(splitTime[1]));
+    },
+    updateSubtitle: function (fileName) {
+      const track = document.querySelector('#my-video track[kind="subtitles"]');
+      track.setAttribute('src', `/subtitle/${fileName}.vtt`);
+      main.subtitle = fileName;
+    },
+    clickDownloadSubtitle: function () {
+      console.log('clickDownloadSubtitle')
+      console.log(main.subtitle);
+      fetch(`/download/subtitle/${main.subtitle}`, {
+        method: 'GET',
+      })
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+
+        // Create a new anchor element
+        const a = document.createElement('a');
+
+        // Set the href and download attributes for the anchor element
+        a.href = url;
+        a.download = `${main.subtitle}.vtt`;
+
+        // Append the anchor to the body, click it, and remove it
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        // Release the URL object
+        window.URL.revokeObjectURL(url);
+
+      })
+    }
+  }
+  main.init();
+</script>
+</html>
