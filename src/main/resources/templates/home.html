@@ -14,7 +14,25 @@
   <p>Enter youtube url and click get video button</p>
   <div id="videoContainer" style="width: 640px; height: 360px">
     <img src="start.png" id="start">
-    </video>
+<!--    <video-->
+<!--        id="my-video"-->
+<!--        class="video-js"-->
+<!--        controls-->
+<!--        preload="auto"-->
+<!--        width="640"-->
+<!--        height="264"-->
+<!--        poster="/thumbnail/d71a5332-e24f-4858-abf9-e27a4db749e2.jpg"-->
+<!--        data-setup="{}"-->
+<!--    >-->
+<!--      <source src="/video/d71a5332-e24f-4858-abf9-e27a4db749e2.webm" type="video/webm" />-->
+<!--      <p class="vjs-no-js">-->
+<!--        To view this video please enable JavaScript, and consider upgrading to a-->
+<!--        web browser that-->
+<!--        <a href="https://videojs.com/html5-video-support/" target="_blank"-->
+<!--        >supports HTML5 video</a-->
+<!--        >-->
+<!--      </p>-->
+<!--    </video>-->
   </div>
 </div>
 <input type="text" id="videoUrl">
@@ -33,7 +51,7 @@
       document.querySelector('#videoContainer').innerHTML = `
       <img src="loading.png" id="loading">
     `;
-      fetch('/youtube-download', {
+      fetch('/download/youtube', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,7 +74,7 @@
       document.getElementById('videoContainer').innerHTML = `
       <video
         id="my-video"
-        class="video-js vjs-default-skin"
+        class="video-js vjs-tech"
         width="640"
         height="360"
         controls
@@ -74,6 +92,7 @@
         </p>
       </video>
     `;
+      videojs('my-video')
     },
     displaySubtitles: function () {
 
@@ -110,8 +129,9 @@
       })
       .then(() => {
         document.querySelector("#checkLoop").addEventListener('change', () => {
-          const video = document.querySelector('#my-video');
-          video.removeEventListener('timeupdate', video.onTimeUpdate);
+          // const video = document.querySelector('#my-video');
+          const video = videojs('my-video');
+          video.off('timeupdate');
         });
         console.log('displaySubtitles')
         console.log(main.subtitle);
@@ -151,7 +171,6 @@
         ;
         document.querySelectorAll('.move-time').forEach(moveTimeClick => {
           moveTimeClick.addEventListener('click', (e) => {
-            e.preventDefault();
             main.moveSubtitleTime(moveTimeClick.dataset.value, e);
           });
         });
@@ -169,22 +188,23 @@
       return hours * 3600 + minutes * 60 + seconds + milliseconds;
     },
     moveSubtitleTime: function (timeString) {
-      const video = document.querySelector('#my-video');
+      const video = videojs('my-video')
       const splitTime = timeString.split('-->');
       const loopStart = main.convertTimeToSeconds(splitTime[0]);
       const loopEnd = main.convertTimeToSeconds(splitTime[1]);
 
-      video.removeEventListener('timeupdate', video.onTimeUpdate);
-      video.currentTime = loopStart;
+      video.off('timeupdate');
+      // video.currentTime = loopStart;
 
       const onTimeUpdate = function () {
-        if (this.currentTime >= loopEnd && document.querySelector('#checkLoop').checked) {
-          video.currentTime = loopStart;
+        if (video.currentTime() >= loopEnd && document.querySelector('#checkLoop').checked) {
+          video.currentTime(loopStart)
         }
       }
-      video.addEventListener('timeupdate', onTimeUpdate);
+      video.on('timeupdate', onTimeUpdate);
+      video.currentTime(loopStart)
       video.play();
-      video.onTimeUpdate = onTimeUpdate;
+      // video.onTimeUpdate = onTimeUpdate;
     },
     validateTime: function (time) {
       console.log(time);
@@ -197,9 +217,22 @@
       return (startTimeRegex.test(splitTime[0]) && endTimeRegex.test(splitTime[1]));
     },
     updateSubtitle: function (fileName) {
-      const track = document.querySelector('#my-video track[kind="subtitles"]');
-      track.setAttribute('src', `/subtitle/${fileName}.vtt`);
+      // const track = document.querySelector('#my-video track[kind="subtitles"]');
+      const player = videojs('my-video');
+      const oldTrack = player.textTracks()[0];
+      if (oldTrack) {
+        player.removeRemoteTextTrack(oldTrack);
+      }
       main.subtitle = fileName;
+      const newTrack = player.addRemoteTextTrack({
+        kind: 'subtitles',
+        src: `/subtitle/${fileName}.vtt`,
+        srclang: 'ko',
+        label: 'Korean'
+      }, false).track;
+
+      newTrack.mode = 'showing';
+
     },
     clickDownloadSubtitle: function () {
       console.log('clickDownloadSubtitle')
@@ -211,23 +244,36 @@
       .then(blob => {
         const url = window.URL.createObjectURL(blob);
 
-        // Create a new anchor element
         const a = document.createElement('a');
 
-        // Set the href and download attributes for the anchor element
         a.href = url;
         a.download = `${main.subtitle}.vtt`;
-
-        // Append the anchor to the body, click it, and remove it
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-
-        // Release the URL object
         window.URL.revokeObjectURL(url);
 
       })
-    }
+    },
+    updateThumbnail: function (fileName, time) {
+      fetch(`/update/thumbnail/${fileName}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          time: time,
+        }),
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log(data)
+        videojs('my-video').poster(`/thumbnail/${data.fileName}.jpg`);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    },
   }
   main.init();
 </script>

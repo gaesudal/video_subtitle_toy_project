@@ -2,7 +2,6 @@ package com.sudal.video.controller;
 
 
 import com.sudal.video.model.ApiResponse;
-import com.sudal.video.model.Param;
 import com.sudal.video.service.ApiService;
 import java.io.IOException;
 import java.util.HashMap;
@@ -27,7 +26,7 @@ public class ApiController {
 
     private final ApiService apiService;
 
-    @PostMapping("/youtube-download")
+    @PostMapping("/download/youtube")
     public ApiResponse downloadYouTubeVideo(@RequestBody HashMap<String, Object> map) throws IOException, InterruptedException {
 
         String url = map.get("url").toString().trim();
@@ -44,7 +43,7 @@ public class ApiController {
 
         boolean isThumbnailMade = false;
         if (isConverted) {
-            isThumbnailMade = apiService.makeThumbnail(fileName);
+            isThumbnailMade = apiService.makeThumbnail(fileName, "1");
         }
 
         boolean isSubtitleMade = false;
@@ -85,6 +84,27 @@ public class ApiController {
             apiResponse.setResultCode("200");
             apiResponse.setMessage("success");
             apiResponse.setFileName(fileName.concat("_update"));
+        } else {
+            apiResponse.setResultCode("500");
+            apiResponse.setMessage("fail");
+        }
+        return apiResponse;
+    }
+
+    @PostMapping("/update/thumbnail/{fileName}")
+    public ApiResponse updateThumbnail(@PathVariable String fileName, @RequestBody HashMap<String, Object> map) throws IOException, InterruptedException {
+
+        String time = map.get("time").toString().trim();
+        log.info("Update Thumbnail - fileName : {}", fileName);
+        log.info("Update Thumbnail - time : {}", time);
+
+        boolean isThumbnailMade = apiService.makeThumbnail(fileName, time);
+
+        ApiResponse apiResponse = new ApiResponse();
+        if (isThumbnailMade) {
+            apiResponse.setResultCode("200");
+            apiResponse.setMessage("success");
+            apiResponse.setFileName(fileName);
         } else {
             apiResponse.setResultCode("500");
             apiResponse.setMessage("fail");

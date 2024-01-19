@@ -37,7 +37,7 @@ public class ApiService {
         log.info("fileName : {}", fileName);
 
         ProcessBuilder processBuilder = new ProcessBuilder(
-                "yt-dlp", "-P", downloadDir.concat("video\\"),
+                "yt-dlp", "-P", downloadDir.concat("video").concat(File.separator),
                 "--ignore-errors",
                 "--merge-output-format", "webm",
                 "-o", fileName,
@@ -116,16 +116,16 @@ public class ApiService {
         }
     }
 
-    public boolean makeThumbnail(String fileName) throws IOException, InterruptedException {
+    public boolean makeThumbnail(String fileName, String second) throws IOException, InterruptedException {
         String webmFileName = fileName.concat(".webm");
 
         log.info("webmFileName : {}", webmFileName);
 
         ProcessBuilder processBuilder = new ProcessBuilder(
                 "ffmpeg", "-i",
-                downloadDir.concat("video\\").concat(webmFileName),
-                "-ss", "00:00:01", "-vframes", "1", "-an", "-s", "640x360",
-                downloadDir.concat("thumbnail\\").concat(fileName)
+                downloadDir.concat("video").concat(File.separator).concat(webmFileName),
+                "-ss", second, "-vframes", "1", "-an", "-s", "640x360",
+                downloadDir.concat("thumbnail").concat(File.separator).concat(fileName)
                         .concat(".jpg"));
 
         processBuilder.redirectErrorStream(true);
@@ -164,8 +164,8 @@ public class ApiService {
         processBuilder = new ProcessBuilder("python",
                 downloadDir.concat("test.py"),
                 model,
-                downloadDir.concat("audio\\").concat(fileName).concat(".mp3"),
-                downloadDir.concat("subtitle\\"));
+                downloadDir.concat("audio").concat(File.separator).concat(fileName).concat(".mp3"),
+                downloadDir.concat("subtitle").concat(File.separator));
 
         processBuilder.environment().put("PYTHONIOENCODING", "UTF-8");
         processBuilder.redirectErrorStream(true);
@@ -186,7 +186,7 @@ public class ApiService {
 
             process.waitFor();
 
-            File vttFile = new File(downloadDir.concat("subtitle\\").concat(fileName).concat(".vtt"));
+            File vttFile = new File(downloadDir.concat("subtitle").concat(File.separator).concat(fileName).concat(".vtt"));
 
             if (vttFile.exists()) {
                 log.info("vttFile exists");
@@ -230,7 +230,7 @@ public class ApiService {
     }
 
     public String downloadSubtitle(String fileName) {
-        Path filePath = Path.of(downloadDir.concat("subtitle\\").concat(fileName).concat(".vtt"));
+        Path filePath = Path.of(downloadDir.concat("subtitle").concat(File.separator).concat(fileName).concat(".vtt"));
         try {
             return Files.readString(filePath);
         } catch (IOException e) {
@@ -240,7 +240,7 @@ public class ApiService {
 
     public boolean updateSubtitle(String fileName, List<String> subtitles) {
         String updateFileName = fileName.concat("_update");
-        String filePath = downloadDir.concat("subtitle\\").concat(updateFileName).concat(".vtt");
+        String filePath = downloadDir.concat("subtitle").concat(File.separator).concat(updateFileName).concat(".vtt");
 
         try (FileWriter fileWriter = new FileWriter(filePath, false);
                 BufferedWriter bufferedWriter = new BufferedWriter(fileWriter)){
@@ -254,6 +254,7 @@ public class ApiService {
         }
         return true;
     }
+
 }
 
 
