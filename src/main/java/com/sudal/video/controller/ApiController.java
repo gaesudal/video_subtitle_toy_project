@@ -1,14 +1,16 @@
 package com.sudal.video.controller;
 
 
+import com.sudal.video.constant.ResultCode;
+import com.sudal.video.model.ApiRequest;
 import com.sudal.video.model.ApiResponse;
 import com.sudal.video.service.ApiService;
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,88 +29,66 @@ public class ApiController {
     private final ApiService apiService;
 
     @PostMapping("/download/youtube")
-    public ApiResponse downloadYouTubeVideo(@RequestBody HashMap<String, Object> map) throws IOException, InterruptedException {
+    public ResponseEntity<ApiResponse> downloadYouTubeVideo(@RequestBody ApiRequest apiRequest) {
 
-        String url = map.get("url").toString().trim();
+        String url = apiRequest.getUrl().trim();
+        String model = apiRequest.getModel().trim();
+
         log.info("Download Youtube Video - URL : {}", url);
+        log.info("Download Youtube Video - Whisper model : {}", model);
+
+        apiRequest.isYoutubeUrl();
 
         String fileName = UUID.randomUUID().toString();
 
-        boolean isDownloaded = apiService.downloadYouTubeVideo(url,fileName);
+        apiService.downloadYouTubeVideo(url,fileName);
+        apiService.convertWebmToMp3(fileName);
+        apiService.makeThumbnail(fileName, "1");
+        apiService.makeSubtitle(fileName, model);
 
-        boolean isConverted = false;
-        if (isDownloaded) {
-            isConverted = apiService.convertWebmToMp3(fileName);
-        }
-
-        boolean isThumbnailMade = false;
-        if (isConverted) {
-            isThumbnailMade = apiService.makeThumbnail(fileName, "1");
-        }
-
-        boolean isSubtitleMade = false;
-        if (isThumbnailMade) {
-            isSubtitleMade = apiService.makeSubtitle(fileName, "tiny");
-        }
-
-        ApiResponse apiResponse = new ApiResponse();
-        if (isSubtitleMade) {
-            apiResponse.setResultCode("200");
-            apiResponse.setMessage("success");
-            apiResponse.setFileName(fileName);
-        } else {
-            apiResponse.setResultCode("500");
-            apiResponse.setMessage("fail");
-        }
-        return apiResponse;
+        return new ResponseEntity<>(
+                ApiResponse.of(
+                        ResultCode.OK,
+                        fileName
+                ), HttpStatus.OK);
     }
 
     @GetMapping("/download/subtitle/{fileName}")
-    public String downloadSubtitle(@PathVariable String fileName) {
+    public ResponseEntity<String> downloadSubtitle(@PathVariable String fileName) {
         log.info("Download Subtitle - fileName : {}", fileName);
-        return apiService.downloadSubtitle(fileName);
+        return new ResponseEntity<>(apiService.downloadSubtitle(fileName), HttpStatus.OK);
     }
 
     @PutMapping("/update/subtitle/{fileName}")
-    public ApiResponse updateSubtitle(@PathVariable String fileName, @RequestBody HashMap<String, Object> map) {
+    public ResponseEntity<ApiResponse> updateSubtitle(@PathVariable String fileName, @RequestBody ApiRequest apiRequest) {
 
-        List<String> subtitles = (List<String>) map.get("subtitles");
+        List<String> subtitles = apiRequest.getSubtitles();
 
         log.info("Update Subtitle - fileName : {}", fileName);
         log.info("Update Subtitle - subtitles : {}", subtitles.toString());
 
-        boolean isSubtitleUpdate = apiService.updateSubtitle(fileName, subtitles);
+        apiService.updateSubtitle(fileName, subtitles);
 
-        ApiResponse apiResponse = new ApiResponse();
-        if (isSubtitleUpdate) {
-            apiResponse.setResultCode("200");
-            apiResponse.setMessage("success");
-            apiResponse.setFileName(fileName.concat("_update"));
-        } else {
-            apiResponse.setResultCode("500");
-            apiResponse.setMessage("fail");
-        }
-        return apiResponse;
+        String updateFileName = fileName.concat("_update");
+
+        return new ResponseEntity<>(ApiResponse.of(
+                ResultCode.OK,
+                updateFileName
+        ), HttpStatus.OK);
     }
 
     @PostMapping("/update/thumbnail/{fileName}")
-    public ApiResponse updateThumbnail(@PathVariable String fileName, @RequestBody HashMap<String, Object> map) throws IOException, InterruptedException {
+    public ResponseEntity<ApiResponse> updateThumbnail(@PathVariable String fileName, @RequestBody ApiRequest apiRequest) {
 
-        String time = map.get("time").toString().trim();
+        String time = apiRequest.getTime().trim();
         log.info("Update Thumbnail - fileName : {}", fileName);
         log.info("Update Thumbnail - time : {}", time);
 
-        boolean isThumbnailMade = apiService.makeThumbnail(fileName, time);
+        apiService.makeThumbnail(fileName, time);
 
-        ApiResponse apiResponse = new ApiResponse();
-        if (isThumbnailMade) {
-            apiResponse.setResultCode("200");
-            apiResponse.setMessage("success");
-            apiResponse.setFileName(fileName);
-        } else {
-            apiResponse.setResultCode("500");
-            apiResponse.setMessage("fail");
-        }
-        return apiResponse;
+        return new ResponseEntity<>(ApiResponse.of(
+                        ResultCode.OK,
+                        fileName
+                ), HttpStatus.OK);
     }
 }

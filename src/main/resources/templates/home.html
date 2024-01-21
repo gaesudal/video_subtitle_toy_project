@@ -1,7 +1,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <!DOCTYPE html>
 <html>
-<link href="https://vjs.zencdn.net/8.9.0/video-js.css" rel="stylesheet" />
+<link href="https://vjs.zencdn.net/8.9.0/video-js.css" rel="stylesheet"/>
 <style>
   #my-video {
     width: 640px;
@@ -14,29 +14,37 @@
   <p>Enter youtube url and click get video button</p>
   <div id="videoContainer" style="width: 640px; height: 360px">
     <img src="start.png" id="start">
-<!--    <video-->
-<!--        id="my-video"-->
-<!--        class="video-js"-->
-<!--        controls-->
-<!--        preload="auto"-->
-<!--        width="640"-->
-<!--        height="264"-->
-<!--        poster="/thumbnail/d71a5332-e24f-4858-abf9-e27a4db749e2.jpg"-->
-<!--        data-setup="{}"-->
-<!--    >-->
-<!--      <source src="/video/d71a5332-e24f-4858-abf9-e27a4db749e2.webm" type="video/webm" />-->
-<!--      <p class="vjs-no-js">-->
-<!--        To view this video please enable JavaScript, and consider upgrading to a-->
-<!--        web browser that-->
-<!--        <a href="https://videojs.com/html5-video-support/" target="_blank"-->
-<!--        >supports HTML5 video</a-->
-<!--        >-->
-<!--      </p>-->
-<!--    </video>-->
+    <!--    <video-->
+    <!--        id="my-video"-->
+    <!--        class="video-js"-->
+    <!--        controls-->
+    <!--        preload="auto"-->
+    <!--        width="640"-->
+    <!--        height="264"-->
+    <!--        poster="/thumbnail/d71a5332-e24f-4858-abf9-e27a4db749e2.jpg"-->
+    <!--        data-setup="{}"-->
+    <!--    >-->
+    <!--      <source src="/video/d71a5332-e24f-4858-abf9-e27a4db749e2.webm" type="video/webm" />-->
+    <!--      <p class="vjs-no-js">-->
+    <!--        To view this video please enable JavaScript, and consider upgrading to a-->
+    <!--        web browser that-->
+    <!--        <a href="https://videojs.com/html5-video-support/" target="_blank"-->
+    <!--        >supports HTML5 video</a-->
+    <!--        >-->
+    <!--      </p>-->
+    <!--    </video>-->
   </div>
 </div>
 <input type="text" id="videoUrl">
-<button id="getVideoButton">get video</button><div id="subtitleButton"></div>
+<button id="getVideoButton">get video</button>
+<select id="selectModel">tiny base small medium large
+  <option value="tiny">tiny</option>
+  <option value="base">base</option>
+  <option value="small">small</option>
+  <option value="medium">medium</option>
+  <option value="large">large</option>
+</select>
+<div id="subtitleDiv"></div>
 <table id="subtitlesTable"></table>
 </body>
 <script src="https://vjs.zencdn.net/8.9.0/video.min.js"></script>
@@ -58,10 +66,18 @@
         },
         body: JSON.stringify({
           url: document.querySelector('#videoUrl').value,
+          model: document.querySelector('#selectModel').value,
         }),
       })
       .then(response => response.json())
       .then(data => {
+        if (data.code !== '0') {
+          document.querySelector('#videoContainer').innerHTML = `
+      <img src="start.png" id="start">
+    `;
+          alert(data.message);
+          return;
+        }
         main.updateVideoSource(data.fileName);
         main.subtitle = data.fileName;
         main.displaySubtitles(data.fileName);
@@ -101,14 +117,14 @@
       .then(data => {
         const lines = data.split('\n');
 
-        const subtitleButton = document.getElementById('subtitleButton');
-        subtitleButton.innerHTML = '';
-        subtitleButton.innerHTML += '<span>Loop</span><input type="checkbox" id="checkLoop">';
-        subtitleButton.innerHTML += '<button id="downloadSubtitle">자막다운</button>'
-        subtitleButton.innerHTML += '<button id="updateSubtitle">자막수정</button>'
+        const subtitleDiv = document.getElementById('subtitleDiv');
+        subtitleDiv.innerHTML = '';
+        subtitleDiv.innerHTML += '<span>Loop</span><input type="checkbox" id="checkLoop">';
+        subtitleDiv.innerHTML += '<button id="downloadSubtitle">자막다운</button>'
+        subtitleDiv.innerHTML += '<button id="updateSubtitle">자막수정</button>'
 
         const table = document.getElementById('subtitlesTable');
-        table.innerHTML += '<tr><th>순서</th><th>시간</th><th>대사</th></tr>';
+        table.innerHTML = '<tr><th>순서</th><th>시간</th><th>대사</th></tr>';
 
         let number = '', time = '', text = '';
         for (let i = 2; i < lines.length; i++) {
@@ -135,7 +151,8 @@
         });
         console.log('displaySubtitles')
         console.log(main.subtitle);
-        document.querySelector("#downloadSubtitle").addEventListener('click', main.clickDownloadSubtitle);
+        document.querySelector("#downloadSubtitle").addEventListener('click',
+            main.clickDownloadSubtitle);
         document.querySelector("#updateSubtitle").addEventListener('click', () => {
           const inputTimes = document.querySelectorAll('.input-time');
           const inputTexts = document.querySelectorAll('.input-text');
