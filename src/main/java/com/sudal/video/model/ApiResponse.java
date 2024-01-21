@@ -2,6 +2,7 @@ package com.sudal.video.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.sudal.video.constant.ResultCode;
+import com.sudal.video.exception.ApiException;
 import lombok.Getter;
 
 /**
@@ -20,6 +21,11 @@ public class ApiResponse {
         this.message = resultCode.getMessage();
     }
 
+    public ApiResponse(String code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+
     public ApiResponse(ResultCode resultCode, String fileName) {
         this.code = resultCode.getCode();
         this.message = resultCode.getMessage();
@@ -32,6 +38,10 @@ public class ApiResponse {
 
     public static ApiResponse of(ResultCode resultCode, String fileName) {
         return new ApiResponse(resultCode, fileName);
+    }
+
+    public static ApiResponse of(ApiException e) {
+        return new ApiResponse(e.getCode(), e.getMessage());
     }
 
     public static ApiResponse of(Exception e) {
